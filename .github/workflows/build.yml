@@ -1,33 +1,25 @@
-name: Build Windows EXE
+name: Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller python-docx openpyxl pywin32
-
-    - name: Build EXE
-      run: |
-        pyinstaller --onefile --windowed --name "批量关键词替换工具" batch_replacer.py
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: batch-replacer-exe
-        path: dist/批量关键词替换工具.exe
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - run: pip install pyinstaller python-docx openpyxl
+      
+      - run: pyinstaller --onefile --windowed -n "batch-replacer" batch_replacer.py
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist/batch-replacer.exe
