@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-批量关键词替换工具 v1.0
+批量关键词替换工具 v1.1
 功能：批量修改Word/Excel文件中的关键词
-支持格式：.doc, .docx, .xls, .xlsx
+支持格式：.docx, .xlsx
+说明：不支持旧格式 .doc/.xls，请先用Office另存为新格式
 """
 
 import os
@@ -24,17 +25,11 @@ try:
 except ImportError:
     HAS_OPENPYXL = False
 
-try:
-    import win32com.client
-    HAS_WIN32COM = True
-except ImportError:
-    HAS_WIN32COM = False
-
 
 class BatchReplacerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("批量关键词替换工具 v1.0")
+        self.root.title("批量关键词替换工具 v1.1")
         self.root.geometry("600x500")
         self.root.resizable(True, True)
         
@@ -51,12 +46,13 @@ class BatchReplacerApp:
             missing.append("python-docx (处理.docx)")
         if not HAS_OPENPYXL:
             missing.append("openpyxl (处理.xlsx)")
-        if not HAS_WIN32COM:
-            missing.append("pywin32 (处理.doc/.xls)")
         
         if missing:
             self.log(f"⚠️ 缺少依赖库: {', '.join(missing)}")
-            self.log("请安装: pip install python-docx openpyxl pywin32")
+        else:
+            self.log("✓ 依赖库检查通过")
+            self.log("支持格式: .docx, .xlsx")
+            self.log("注意: .doc/.xls 请先用Office另存为新格式")
     
     def create_widgets(self):
         """创建界面组件"""
@@ -209,41 +205,72 @@ class BatchReplacerApp:
         self.log("=" * 50)
         self.log("开始处理...")
         
-        # 支持的文件扩展名
-        extensions = ['.doc', '.docx', '.xls', '.xlsx']
+        # 支持的文件扩展名（仅新格式）
+        supported_extensions = ['.docx', '.xlsx']
+        # 旧格式提示
+        old_extensions = ['.doc', '.xls']
         
         processed = 0
         errors = 0
+        skipped_old = 0
         
+        # 先检查是否有旧格式文件
+        old_files = []
         for root, dirs, files in os.walk(folder):
-            # 跳过输出文件夹
+            if "替换后文件" in root:
+                continue
+            for filename in files:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in old_extensions:
+                    old_files.append(filename)
+        
+        if old_files:
+            self.log(f"⚠️ 发现 {len(old_files)} 个旧格式文件，已跳过:")
+            for f in old_files[:5]:  # 只显示前5个
+                self.log(f"   {f}")
+            if len(old_files) > 5:
+                self.log(f"   ... 还有 {len(old_files) - 5} 个")
+            self.log("提示: 请用Office打开后另存为 .docx/.xlsx 格式")
+        
+        # 处理支持的文件
+        for root, dirs, files in os.walk(folder):
             if "替换后文件" in root:
                 continue
             
             for filename in files:
                 ext = os.path.splitext(filename)[1].lower()
-                if ext in extensions:
-                    filepath = os.path.join(root, filename)
+                
+                if ext in old_extensions:
+                    skipped_old += 1
+                    continue
+                
+                if ext not in supported_extensions:
+                    continue
+                
+                filepath = os.path.join(root, filename)
+                
+                try:
+                    if ext == '.docx':
+                        self.replace_docx(filepath, output_folder)
+                    elif ext == '.xlsx':
+                        self.replace_xlsx(filepath, output_folder)
                     
-                    try:
-                        if ext in ['.docx']:
-                            self.replace_docx(filepath, output_folder)
-                        elif ext in ['.doc']:
-                            self.replace_doc(filepath, output_folder)
-                        elif ext in ['.xlsx']:
-                            self.replace_xlsx(filepath, output_folder)
-                        elif ext in ['.xls']:
-                            self.replace_xls(filepath, output_folder)
-                        
-                        processed += 1
-                        self.log(f"✓ {filename}")
-                    except Exception as e:
-                        errors += 1
-                        self.log(f"✗ {filename}: {str(e)}")
+                    processed += 1
+                    self.log(f"✓ {filename}")
+                except Exception as e:
+                    errors += 1
+                    self.log(f"✗ {filename}: {str(e)}")
         
         self.log("=" * 50)
-        self.log(f"处理完成！成功: {processed}, 失败: {errors}")
-        messagebox.showinfo("完成", f"处理完成！\n成功: {processed}\n失败: {errors}")
+        summary = f"处理完成！成功: {processed}, 失败: {errors}"
+        if skipped_old > 0:
+            summary += f", 跳过旧格式: {skipped_old}"
+        self.log(summary)
+        
+        if skipped_old > 0:
+            messagebox.showwarning("完成", f"{summary}\n\n⚠️ 有 {skipped_old} 个旧格式文件(.doc/.xls)被跳过\n请用Office另存为新格式后重试")
+        else:
+            messagebox.showinfo("完成", summary)
     
     def replace_docx(self, filepath, output_folder):
         """替换.docx文件中的关键词"""
@@ -276,31 +303,6 @@ class BatchReplacerApp:
         output_path = os.path.join(output_folder, filename)
         doc.save(output_path)
     
-    def replace_doc(self, filepath, output_folder):
-        """替换.doc文件中的关键词（使用Word COM）"""
-        if not HAS_WIN32COM:
-            raise Exception("缺少pywin32库，无法处理.doc文件")
-        
-        word = win32com.client.Dispatch("Word.Application")
-        word.Visible = False
-        
-        try:
-            doc = word.Documents.Open(filepath)
-            
-            for old, new in self.replace_rules:
-                # 使用Word的查找替换功能
-                find = doc.Content.Find
-                find.ClearFormatting()
-                find.Replacement.ClearFormatting()
-                find.Execute(old, False, False, False, False, False, True, 1, True, new, 2)
-            
-            filename = os.path.basename(filepath)
-            output_path = os.path.join(output_folder, filename)
-            doc.SaveAs(output_path)
-            doc.Close()
-        finally:
-            word.Quit()
-    
     def replace_xlsx(self, filepath, output_folder):
         """替换.xlsx文件中的关键词"""
         if not HAS_OPENPYXL:
@@ -319,34 +321,6 @@ class BatchReplacerApp:
         filename = os.path.basename(filepath)
         output_path = os.path.join(output_folder, filename)
         wb.save(output_path)
-    
-    def replace_xls(self, filepath, output_folder):
-        """替换.xls文件中的关键词（使用Excel COM）"""
-        if not HAS_WIN32COM:
-            raise Exception("缺少pywin32库，无法处理.xls文件")
-        
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
-        
-        try:
-            wb = excel.Workbooks.Open(filepath)
-            
-            for sheet in wb.Sheets:
-                used_range = sheet.UsedRange
-                for row in used_range.Rows:
-                    for cell in row.Cells:
-                        if cell.Value and isinstance(cell.Value, str):
-                            for old, new in self.replace_rules:
-                                if old in cell.Value:
-                                    cell.Value = cell.Value.replace(old, new)
-            
-            filename = os.path.basename(filepath)
-            output_path = os.path.join(output_folder, filename)
-            wb.SaveAs(output_path)
-            wb.Close()
-        finally:
-            excel.Quit()
 
 
 def main():
