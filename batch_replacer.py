@@ -30,7 +30,8 @@ class BatchReplacerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("批量关键词替换工具 v1.1")
-        self.root.geometry("600x500")
+        self.root.geometry("650x600")
+        self.root.minsize(600, 550)
         self.root.resizable(True, True)
         
         # 替换规则列表
