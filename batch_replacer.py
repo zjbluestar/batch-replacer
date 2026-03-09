@@ -129,12 +129,26 @@ class BatchReplacerApp:
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 操作按钮
+        # 操作按钮（底部醒目位置）
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=10)
+        button_frame.pack(fill=tk.X, pady=15)
         
-        ttk.Button(button_frame, text="开始替换", command=self.start_replace).pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="退出", command=self.root.quit).pack(side=tk.RIGHT, padx=10)
+        # 开始替换按钮（大而醒目）
+        self.start_btn = tk.Button(
+            button_frame, 
+            text="▶ 开始执行替换", 
+            command=self.start_replace,
+            font=("微软雅黑", 14, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            width=20,
+            height=2,
+            relief=tk.RAISED,
+            cursor="hand2"
+        )
+        self.start_btn.pack(side=tk.LEFT, padx=20)
+        
+        ttk.Button(button_frame, text="退出程序", command=self.root.quit).pack(side=tk.RIGHT, padx=20)
     
     def select_folder(self):
         """选择文件夹"""
